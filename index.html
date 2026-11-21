@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1d4ed8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Budżet">
+  <title>Budżet Rodzinny</title>
+  <link rel="manifest" href="manifest.webmanifest?v=1.0">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v=1.0">
+  <link rel="apple-touch-icon" href="icon.svg?v=1.0">
+  <link rel="stylesheet" href="css/style.css?v=1.0">
+</head>
+<body>
+
+  <!-- EKRAN LOGOWANIA FIREBASE (widoczny dopiero po podpięciu konfiguracji Firebase) -->
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:38px; margin-bottom:6px;">💳</div>
+        <h2 style="margin:0; font-size:21px; font-weight:900;">Budżet Rodzinny</h2>
+        <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Zaloguj się raz — urządzenie zapamięta sesję</p>
+      </div>
+      <form onsubmit="BR_APP.handleFirebaseLogin(event)">
+        <div class="form-row">
+          <label class="form-label">Adres e-mail</label>
+          <input id="authEmail" type="email" class="input" style="width:100%;" required autocomplete="email" placeholder="np. michal@...">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Hasło</label>
+          <input id="authPass" type="password" class="input" style="width:100%;" required autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <div id="authError" style="color:#dc2626; font-size:12px; font-weight:700; margin-bottom:10px;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:14px;">Zaloguj się</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- NAGŁÓWEK -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-wrap">
+        <div class="brand-logo">💳</div>
+        <div>
+          <div class="brand-title">Budżet Rodzinny</div>
+          <div class="brand-sub" id="hdrSyncText">
+            <span class="sync-dot local"></span>
+            <span>Tryb lokalny</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="hdrUserBtn" class="hdr-btn" onclick="BR_APP.toggleDeviceUser()" title="Przełącz profil (tryb lokalny)">👤 Michał</button>
+        <button id="hdrYearBtn" class="hdr-btn year-btn" onclick="BR_MODALS.openYearLobby()">📅 2026 ▾</button>
+        <button class="hdr-btn" onclick="BR_APP.setTab('settings')" title="Ustawienia">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- PASEK MIESIĘCY -->
+  <div id="monthStripWrap" class="month-strip-wrap">
+    <div id="monthStrip" class="month-strip"></div>
+  </div>
+
+  <!-- GŁÓWNA ZAWARTOŚĆ -->
+  <main id="appMain" class="app-main"></main>
+
+  <!-- PRZYCISK EKSPRESOWEGO DODAWANIA (+) -->
+  <button class="fab-add" aria-label="Dodaj operację" onclick="BR_MODALS.openTxModal(BR_APP.getYear(), BR_APP.getMonth())">+</button>
+
+  <!-- DOLNA NAWIGACJA (MOBILE-FIRST) -->
+  <nav class="bottom-nav">
+    <div id="bottomNavInner" class="bottom-nav-inner"></div>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EKSPRESOWE DODAWANIE / EDYCJA OPERACJI            -->
+  <!-- ======================================================== -->
+  <div id="modalTx" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalTx')">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3 id="txModalTitle">Szybka operacja</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalTx')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="type-toggle">
+          <button type="button" id="txTypeExp" class="type-btn active expense" onclick="BR_MODALS.setTxType('expense', BR_APP.getYear())">Wydatek</button>
+          <button type="button" id="txTypeInc" class="type-btn" onclick="BR_MODALS.setTxType('income', BR_APP.getYear())">Wpływ</button>
+        </div>
+
+        <input id="txAmount" type="number" inputmode="decimal" step="0.01" min="0" class="amount-big" placeholder="0,00 zł"
+          onkeydown="if(event.key==='Enter') BR_MODALS.saveTxFromModal()">
+
+        <div class="form-label">Kategoria</div>
+        <div id="txCatGrid" class="cat-grid"></div>
+
+        <div class="form-row">
+          <label class="form-label">Opis / sklep / szczegóły</label>
+          <input id="txTitle" type="text" class="input" style="width:100%;" list="txTitleSuggestions"
+            placeholder="np. Biedronka, Paliwo, Czynsz..." onkeydown="if(event.key==='Enter') BR_MODALS.saveTxFromModal()">
+          <datalist id="txTitleSuggestions"></datalist>
+        </div>
+
+        <div class="form-2col">
+          <div class="form-row">
+            <label class="form-label">Data</label>
+            <input id="txDate" type="date" class="input" style="width:100%;">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Osoba</label>
+            <select id="txAuthor" class="select" style="width:100%;">
+              <option value="Michał">Michał</option>
+              <option value="Julia">Julia</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot" style="justify-content:space-between;">
+        <button id="txDeleteBtn" class="btn btn-red" style="display:none;" onclick="BR_MODALS.deleteTxFromModal()">🗑 Usuń</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalTx')">Anuluj</button>
+          <button id="txSaveBtn" class="btn btn-primary" onclick="BR_MODALS.saveTxFromModal()">+ Zapisz wydatek</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: LOBBY LAT (INSPIRACJA KPiR)                       -->
+  <!-- ======================================================== -->
+  <div id="modalYears" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalYears')">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3>📅 Wybierz rok budżetowy</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalYears')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="yearLobbyGrid" class="year-grid"></div>
+        <button class="btn btn-primary" style="width:100%; padding:11px;" onclick="BR_MODALS.createNewYearFromLobby()">+ Otwórz nowy rok (np. 2023, 2024, 2025, 2027)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDYCJA LIMITÓW BUDŻETU NA MIESIĄC                 -->
+  <!-- ======================================================== -->
+  <div id="modalBudgets" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalBudgets')">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3 id="budgetsModalTitle">Limity budżetu</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalBudgets')">&times;</button>
+      </div>
+      <div id="budgetsModalList" class="modal-body"></div>
+      <div class="modal-foot">
+        <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalBudgets')">Anuluj</button>
+        <button class="btn btn-green" onclick="BR_MODALS.saveBudgetsFromModal()">💾 Zapisz limity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SUMY HISTORYCZNE MIESIĄCA                         -->
+  <!-- ======================================================== -->
+  <div id="modalHistorical" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalHistorical')">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3 id="histModalTitle">Sumy historyczne</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalHistorical')">&times;</button>
+      </div>
+      <input type="hidden" id="histTargetMonth">
+      <div id="histModalBody" class="modal-body"></div>
+      <div class="modal-foot">
+        <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalHistorical')">Anuluj</button>
+        <button class="btn btn-green" onclick="BR_MODALS.saveHistoricalFromModal()">💾 Zapisz sumy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: STAŁY WYDATEK                                     -->
+  <!-- ======================================================== -->
+  <div id="modalRecurring" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalRecurring')">
+    <div class="modal-sheet">
+      <div class="modal-head" style="background:#4f46e5;">
+        <h3 id="recModalTitle">Stały wydatek</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalRecurring')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="recId">
+        <div class="form-row">
+          <label class="form-label">Nazwa</label>
+          <input id="recName" type="text" class="input" style="width:100%;" placeholder="np. iCloud, Rata mieszkania...">
+        </div>
+        <div class="form-2col">
+          <div class="form-row">
+            <label class="form-label">Kwota (zł)</label>
+            <input id="recAmount" type="number" step="0.01" class="input" style="width:100%;" placeholder="0.00">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Dzień m-ca (1–31)</label>
+            <input id="recDay" type="number" min="1" max="31" class="input" style="width:100%;">
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Kategoria wydatku</label>
+          <select id="recCategory" class="select" style="width:100%;"></select>
+        </div>
+      </div>
+      <div class="modal-foot" style="justify-content:space-between;">
+        <button id="recDeleteBtn" class="btn btn-red" style="display:none;" onclick="BR_MODALS.deleteRecurringFromModal()">🗑 Usuń</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalRecurring')">Anuluj</button>
+          <button class="btn btn-primary" onclick="BR_MODALS.saveRecurringFromModal()">💾 Zapisz</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: POŻYCZONE KOMUŚ                                   -->
+  <!-- ======================================================== -->
+  <div id="modalLoan" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalLoan')">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3 id="loanModalTitle">Pożyczone komuś</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalLoan')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="loanId">
+        <div class="form-row">
+          <label class="form-label">Osoba / podmiot</label>
+          <input id="loanName" type="text" class="input" style="width:100%;" placeholder="np. Rodzice M, Zuzia, Firma...">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Aktualna kwota pożyczona (zł)</label>
+          <input id="loanAmount" type="number" step="0.01" class="input" style="width:100%;" placeholder="0.00">
+        </div>
+      </div>
+      <div class="modal-foot" style="justify-content:space-between;">
+        <button id="loanDeleteBtn" class="btn btn-red" style="display:none;" onclick="BR_MODALS.deleteLoanFromModal()">🗑 Usuń</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalLoan')">Anuluj</button>
+          <button class="btn btn-primary" onclick="BR_MODALS.saveLoanFromModal()">💾 Zapisz</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: OPERACJA INWESTYCYJNA (WPŁATA / WYPŁATA)          -->
+  <!-- ======================================================== -->
+  <div id="modalInvTx" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalInvTx')">
+    <div class="modal-sheet">
+      <div class="modal-head" style="background:#1d4ed8;">
+        <h3 id="invTxModalTitle">Operacja inwestycyjna</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalInvTx')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="type-toggle">
+          <button type="button" id="invTxTypeDep" class="type-btn active income" onclick="BR_MODALS.setInvTxType('deposit')">+ Wpłata / Zakup</button>
+          <button type="button" id="invTxTypeWdr" class="type-btn" onclick="BR_MODALS.setInvTxType('withdrawal')">− Wypłata / Sprzedaż</button>
+        </div>
+
+        <input id="invTxAmount" type="number" inputmode="decimal" step="0.01" min="0" class="amount-big" placeholder="0,00 zł"
+          onkeydown="if(event.key==='Enter') BR_MODALS.saveInvTxFromModal()">
+
+        <div class="form-row">
+          <label class="form-label">Instrument</label>
+          <select id="invTxInstrument" class="select" style="width:100%;"></select>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Opis / szczegóły</label>
+          <input id="invTxTitle" type="text" class="input" style="width:100%;" placeholder="np. Zakup ETF VWCE, Obligacje EDO..."
+            onkeydown="if(event.key==='Enter') BR_MODALS.saveInvTxFromModal()">
+        </div>
+
+        <div class="form-2col">
+          <div class="form-row">
+            <label class="form-label">Data</label>
+            <input id="invTxDate" type="date" class="input" style="width:100%;">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Osoba</label>
+            <select id="invTxAuthor" class="select" style="width:100%;">
+              <option value="Michał">Michał</option>
+              <option value="Julia">Julia</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot" style="justify-content:space-between;">
+        <button id="invTxDeleteBtn" class="btn btn-red" style="display:none;" onclick="BR_MODALS.deleteInvTxFromModal()">🗑 Usuń</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalInvTx')">Anuluj</button>
+          <button id="invTxSaveBtn" class="btn btn-green" onclick="BR_MODALS.saveInvTxFromModal()">+ Zapisz wpłatę</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: NOWY ELEMENT PORTFELA INWESTYCYJNEGO              -->
+  <!-- ======================================================== -->
+  <div id="modalPortfolioItem" class="modal-backdrop" onclick="if(event.target===this) BR_MODALS.closeModal('modalPortfolioItem')">
+    <div class="modal-sheet">
+      <div class="modal-head" style="background:#1d4ed8;">
+        <h3>💎 Dodaj element portfela</h3>
+        <button class="modal-close" onclick="BR_MODALS.closeModal('modalPortfolioItem')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label class="form-label">Nazwa instrumentu</label>
+          <input id="pfItemName" type="text" class="input" style="width:100%;" placeholder="np. IKZE, Obligacje 4-letnie, Akcje USA..."
+            onkeydown="if(event.key==='Enter') BR_MODALS.savePortfolioItemFromModal()">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Grupa (do alokacji i rebalancingu)</label>
+          <input id="pfItemGroup" type="text" class="input" style="width:100%;" list="pfGroupSuggestions" placeholder="np. IKE, Obligacje, Kruszce, Krypto..."
+            onkeydown="if(event.key==='Enter') BR_MODALS.savePortfolioItemFromModal()">
+          <datalist id="pfGroupSuggestions"></datalist>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Aktualna wartość (zł)</label>
+          <input id="pfItemValue" type="number" step="0.01" min="0" class="input" style="width:100%;" placeholder="0.00"
+            onkeydown="if(event.key==='Enter') BR_MODALS.savePortfolioItemFromModal()">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-soft" onclick="BR_MODALS.closeModal('modalPortfolioItem')">Anuluj</button>
+        <button class="btn btn-primary" onclick="BR_MODALS.savePortfolioItemFromModal()">+ Dodaj do portfela</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="appToast" class="toast"></div>
+
+  <!-- FIREBASE SDK (compat 10.8.0 — jak w PlanTygodnia) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- MODUŁY APLIKACJI -->
+  <script src="js/constants.js?v=1.0"></script>
+  <script src="js/firebase-config.js?v=1.0"></script>
+  <script src="js/firebase.js?v=1.0"></script>
+  <script src="js/store.js?v=1.0"></script>
+  <script src="js/ui-modals.js?v=1.0"></script>
+  <script src="js/app.js?v=1.0"></script>
+</body>
+</html>
