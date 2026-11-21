@@ -210,12 +210,12 @@ window.BR_STORE = (() => {
     notify();
   }
 
-  function applyRemoteState(remotePayload, remoteUpdatedAt) {
+  function applyRemoteState(remotePayload, remoteUpdatedAt, forceFromServer = false) {
     if (!remotePayload || !remotePayload.years) return;
     const remoteTs = remoteUpdatedAt || remotePayload.updatedAt || 0;
     const localTs = (state && state.updatedAt) || 0;
-    // Zawsze nadpisz lokalne dane przykładowe (isDemo) danymi z chmury
-    if (!state || state.isDemo || (!remotePayload.isDemo && remoteTs >= localTs)) {
+    // Zawsze zastosuj świeży stan z serwera (omija różnice zegarów między telefonami) oraz nadpisz demo
+    if (forceFromServer || !state || state.isDemo || (!remotePayload.isDemo && remoteTs >= localTs)) {
       state = remotePayload;
       if (!state.updatedAt && remoteTs) state.updatedAt = remoteTs;
       saveLocalOnly();

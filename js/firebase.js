@@ -14,6 +14,9 @@ window.BR_CLOUD = (() => {
   let currentUser = null;
   let syncTimer = null;
   let isApplyingRemote = false;
+  let lastSentWriteId = null;
+  let activeOnRemote = null;
+  const CLIENT_ID = `dev_${Math.random().toString(36).slice(2, 10)}`;
   let listeners = [];
 
   function isConfigured() {
@@ -107,20 +110,37 @@ window.BR_CLOUD = (() => {
 
   function subscribeFirestore(onRemoteState) {
     if (!db || !currentUser) return;
+    activeOnRemote = onRemoteState;
     const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
     const ref = db.doc(docPath);
 
+    const handleSnap = (snap, fromExplicitFetch = false) => {
+      if (!snap.exists) return;
+      if (!fromExplicitFetch && snap.metadata && snap.metadata.hasPendingWrites) return;
+      const data = snap.data();
+      if (!data || !data.payload) return;
+      if (data.lastWriteId && data.lastWriteId === lastSentWriteId) return;
+
+      isApplyingRemote = true;
+      try {
+        // Jeśli dane przyszły z serwera (nie z lokalnego cache), wymuś zastosowanie niezależnie od zegara telefonu
+        const isFromServer = fromExplicitFetch || !(snap.metadata && snap.metadata.fromCache);
+        onRemoteState(data.payload, data.updatedAt || Date.now(), isFromServer);
+      } finally {
+        isApplyingRemote = false;
+      }
+    };
+
     unsubscribeDoc = ref.onSnapshot(
       (snap) => {
-        if (!snap.exists) return;
-        const data = snap.data();
-        if (data && data.payload) {
-          isApplyingRemote = true;
-          try {
-            onRemoteState(data.payload, data.updatedAt || 0);
-          } finally {
-            isApplyingRemote = false;
-          }
+        handleSnap(snap, false);
+        if (snap.exists && !(snap.metadata && snap.metadata.fromCache)) {
+          emit({
+            mode: 'firebase',
+            loggedIn: true,
+            user: currentUser ? { email: currentUser.email, label: resolveUserLabel(currentUser.email) } : null,
+            text: 'Chmura ✓'
+          });
         }
       },
       (err) => {
@@ -133,6 +153,30 @@ window.BR_CLOUD = (() => {
         });
       }
     );
+
+    // Wymuś natychmiastowy odczyt z serwera przy starcie (omija ewentualny stary cache na iOS/Android)
+    ref.get({ source: 'server' }).then((snap) => handleSnap(snap, true)).catch(() => {});
+  }
+
+  // Po powrocie do aplikacji PWA na telefonie natychmiast dociągnij najnowszy stan z serwera
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && db && currentUser && activeOnRemote) {
+        const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
+        db.doc(docPath).get({ source: 'server' }).then((snap) => {
+          if (!snap.exists) return;
+          const data = snap.data();
+          if (!data || !data.payload) return;
+          if (data.lastWriteId && data.lastWriteId === lastSentWriteId) return;
+          isApplyingRemote = true;
+          try {
+            activeOnRemote(data.payload, data.updatedAt || Date.now(), true);
+          } finally {
+            isApplyingRemote = false;
+          }
+        }).catch(() => {});
+      }
+    });
   }
 
   function pushState(state) {
@@ -148,14 +192,17 @@ window.BR_CLOUD = (() => {
     syncTimer = setTimeout(async () => {
       try {
         const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
-        await db.doc(docPath).set(
-          {
-            payload: state,
-            updatedAt: state.updatedAt || Date.now(),
-            updatedBy: currentUser.email
-          },
-          { merge: true }
-        );
+        // Usuń ewentualne undefined/NaN, które blokują zapis w Firestore
+        const cleanPayload = JSON.parse(JSON.stringify(state));
+        const writeId = `${CLIENT_ID}_${Date.now()}`;
+        lastSentWriteId = writeId;
+        await db.doc(docPath).set({
+          payload: cleanPayload,
+          updatedAt: cleanPayload.updatedAt || Date.now(),
+          updatedBy: currentUser.email,
+          lastWriteId: writeId,
+          serverAt: window.firebase.firestore.FieldValue.serverTimestamp()
+        });
         emit({
           mode: 'firebase',
           loggedIn: true,
@@ -168,10 +215,10 @@ window.BR_CLOUD = (() => {
           mode: 'firebase',
           loggedIn: true,
           user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
-          text: 'Błąd zapisu'
+          text: `Błąd zapisu (${err && err.code ? err.code : 'sieć'})`
         });
       }
-    }, 450);
+    }, 80);
   }
 
   async function login(email, password) {

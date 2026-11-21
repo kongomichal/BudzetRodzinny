@@ -51,8 +51,8 @@ window.BR_APP = (() => {
         updateAuthGate();
         renderHeader();
       });
-      window.BR_CLOUD.init((remotePayload, updatedAt) => {
-        S.applyRemoteState(remotePayload, updatedAt);
+      window.BR_CLOUD.init((remotePayload, updatedAt, forceFromServer) => {
+        S.applyRemoteState(remotePayload, updatedAt, forceFromServer);
       });
     }
 
