@@ -20,4 +20,4 @@ Lista kroków wdrożeniowych do wykonania w kolejnych etapach (po przetestowaniu
 ## 3. Migracja danych historycznych (2023–2026)
 - [x] Po zatwierdzeniu wyglądu i funkcji aplikacji przygotować skrypt importujący dane z `Finanse/` (`2023`, `2024`, `2025`, `2026`, `Podsumowanie budżet osobisty.xlsx`, `Wartość finansowa.xlsx`).
 - [x] Zweryfikować sumy kontrolne każdego miesiąca i roku względem arkuszy Excel (0 błędów).
-- [ ] Zaimportować zweryfikowany plik JSON do aplikacji i zsynchronizować z Firebase.
+- [x] Zaimportować zweryfikowany plik JSON do aplikacji i zsynchronizować z Firebase.
