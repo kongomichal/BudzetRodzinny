@@ -137,6 +137,7 @@ window.BR_CLOUD = (() => {
 
   function pushState(state) {
     if (!db || !currentUser || isApplyingRemote) return;
+    if (state && state.isDemo) return;
     clearTimeout(syncTimer);
     emit({
       mode: 'firebase',

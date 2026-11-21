@@ -132,7 +132,7 @@ window.BR_STORE = (() => {
 
     return {
       version: C.APP_VERSION,
-      updatedAt: Date.now(),
+      updatedAt: withDemo ? 0 : Date.now(),
       isDemo: withDemo,
       years: {
         [curYear]: y2026
@@ -212,8 +212,12 @@ window.BR_STORE = (() => {
 
   function applyRemoteState(remotePayload, remoteUpdatedAt) {
     if (!remotePayload || !remotePayload.years) return;
-    if (!state || (remoteUpdatedAt || 0) >= (state.updatedAt || 0)) {
+    const remoteTs = remoteUpdatedAt || remotePayload.updatedAt || 0;
+    const localTs = (state && state.updatedAt) || 0;
+    // Zawsze nadpisz lokalne dane przykładowe (isDemo) danymi z chmury
+    if (!state || state.isDemo || (!remotePayload.isDemo && remoteTs >= localTs)) {
       state = remotePayload;
+      if (!state.updatedAt && remoteTs) state.updatedAt = remoteTs;
       saveLocalOnly();
       notify();
     }
