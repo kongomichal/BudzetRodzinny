@@ -650,11 +650,11 @@ html, body {
 .tbl-annual {
   table-layout: fixed;
   width: 100%;
-  min-width: 1286px;
+  min-width: 1314px;
 }
 
 .tbl-annual.tbl-annual-year {
-  min-width: 1458px;
+  min-width: 1486px;
 }
 
 .tbl-annual th,
@@ -689,6 +689,15 @@ html, body {
   width: 86px;
   min-width: 86px;
   max-width: 86px;
+}
+
+.tbl-annual.tbl-annual-year th:nth-child(14),
+.tbl-annual.tbl-annual-year td:nth-child(14),
+.tbl-annual:not(.tbl-annual-year) th:last-child,
+.tbl-annual:not(.tbl-annual-year) td:last-child {
+  width: 114px;
+  min-width: 114px;
+  max-width: 114px;
 }
 
 .tbl-annual th:first-child {
