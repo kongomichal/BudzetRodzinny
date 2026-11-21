@@ -210,9 +210,7 @@ window.BR_APP = (() => {
 
     const budgetTiles = C.EXPENSE_CATEGORIES.map(cat => {
       const spent = sum.expensesByCat[cat.id] || 0;
-      const limit = currentMonth === 'ALL'
-        ? (sum.budgets[cat.id] || 0) * 12
-        : (sum.budgets[cat.id] || 0);
+      const limit = sum.budgets[cat.id] || 0;
       const remaining = limit - spent;
       const rawPct = limit > 0 ? Math.round((spent / limit) * 100) : (spent > 0 ? 100 : 0);
       const barPct = Math.min(100, rawPct);

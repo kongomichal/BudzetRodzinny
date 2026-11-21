@@ -422,14 +422,21 @@ window.BR_STORE = (() => {
       // Niezgodność = rzeczywista zmiana stanu kont minus bilans wpisanych operacji
       discrepancy = accountsDelta - balance;
     } else {
-      // Dla całego roku: zsumuj budżety i niezgodności ze wszystkich miesięcy z aktywnością
+      // Dla całego roku: zsumuj rzeczywiste budżety i niezgodności ze wszystkich miesięcy z aktywnością
+      budgets = {};
+      C.EXPENSE_CATEGORIES.forEach(cat => { budgets[cat.id] = 0; });
       C.MONTHS.forEach(m => {
         const md = getMonthData(year, m.id);
         const ms = getMonthSummary(year, m.id);
         if (ms.txCount > 0 || ms.accountsTotal > 0) {
           discrepancy += ms.discrepancy;
+          const mBudgets = md.budgets || makeDefaultBudgets();
+          C.EXPENSE_CATEGORIES.forEach(cat => {
+            const v = Number(mBudgets[cat.id]) || 0;
+            budgets[cat.id] += v;
+            budgetTotal += v;
+          });
         }
-        Object.values(md.budgets || {}).forEach(v => { budgetTotal += Number(v) || 0; });
       });
     }
 
