@@ -383,7 +383,7 @@ window.BR_STORE = (() => {
     let totalIncome = 0;
 
     txs.forEach(t => {
-      const val = Math.abs(Number(t.amount) || 0);
+      const val = Number(t.amount) || 0;
       if (t.type === 'income') {
         totalIncome += val;
         incomeByCat[t.category] = (incomeByCat[t.category] || 0) + val;

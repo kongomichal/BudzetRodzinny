@@ -423,7 +423,7 @@ window.BR_APP = (() => {
         </div>
         <div class="tx-right">
           <div class="tx-amount num ${tx.type}">
-            ${tx.type === 'income' ? '+' : '-'}${C.fmt(tx.amount)}
+            ${C.fmt(tx.type === 'income' ? tx.amount : -tx.amount, true)}
           </div>
           <div class="tx-actions">
             <button type="button" class="tx-act-btn" title="Edytuj operację"

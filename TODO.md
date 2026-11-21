@@ -11,13 +11,13 @@ Lista kroków wdrożeniowych do wykonania w kolejnych etapach (po przetestowaniu
 - [x] Zarejestrować aplikację Web w Firebase i wkleić obiekt `firebaseConfig` do pliku `js/firebase-config.js`.
 
 ## 2. GitHub i publikacja na smartfony (GitHub Pages / PWA)
-- [ ] Utworzyć prywatne lub publiczne repozytorium na GitHubie (np. `BudzetRodzinny`).
-- [ ] Upewnić się, że folder `Finanse/` oraz pliki `.xlsx` są ignorowane przez `.gitignore` (nigdy nie wypychać prywatnych arkuszy na GitHub!).
-- [ ] Zainicjalizować Git w folderze `Budżet rodzinny`, zrobić pierwszy commit i `git push`.
-- [ ] Włączyć **GitHub Pages** w ustawieniach repozytorium (gałąź `main`, katalog `/ (root)`).
+- [x] Utworzyć prywatne lub publiczne repozytorium na GitHubie (np. `BudzetRodzinny`).
+- [x] Upewnić się, że folder `Finanse/` oraz pliki `.xlsx` są ignorowane przez `.gitignore` (nigdy nie wypychać prywatnych arkuszy na GitHub!).
+- [x] Zainicjalizować Git w folderze `Budżet rodzinny`, zrobić pierwszy commit i `git push`.
+- [x] Włączyć **GitHub Pages** w ustawieniach repozytorium (gałąź `main`, katalog `/ (root)`).
 - [ ] Otworzyć link na telefonach (Michał i Julia) i wybrać **„Dodaj do ekranu początkowego”** (PWA).
 
 ## 3. Migracja danych historycznych (2023–2026)
-- [ ] Po zatwierdzeniu wyglądu i funkcji aplikacji przygotować skrypt importujący dane z `Finanse/` (`2023`, `2024`, `2025`, `2026`, `Podsumowanie budżet osobisty.xlsx`, `Wartość finansowa.xlsx`).
-- [ ] Zweryfikować sumy kontrolne każdego miesiąca i roku względem arkuszy Excel (0 błędów).
+- [x] Po zatwierdzeniu wyglądu i funkcji aplikacji przygotować skrypt importujący dane z `Finanse/` (`2023`, `2024`, `2025`, `2026`, `Podsumowanie budżet osobisty.xlsx`, `Wartość finansowa.xlsx`).
+- [x] Zweryfikować sumy kontrolne każdego miesiąca i roku względem arkuszy Excel (0 błędów).
 - [ ] Zaimportować zweryfikowany plik JSON do aplikacji i zsynchronizować z Firebase.
