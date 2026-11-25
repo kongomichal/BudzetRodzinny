@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budzet-rodzinny-v1.4';
+const CACHE_NAME = 'budzet-rodzinny-v1.5';
 const ASSETS = [
   './',
   './index.html',
@@ -30,11 +30,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  // Nigdy nie przechwytuj zapytań do Firebase / Google APIs — tylko pliki własne aplikacji
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((res) => {
-        if (res && res.status === 200 && event.request.url.startsWith(self.location.origin)) {
+        if (res && res.status === 200) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }

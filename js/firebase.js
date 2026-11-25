@@ -12,8 +12,8 @@ window.BR_CLOUD = (() => {
   let db = null;
   let unsubscribeDoc = null;
   let currentUser = null;
-  let syncTimer = null;
   let isApplyingRemote = false;
+  let pendingWritesCount = 0;
   let lastSentWriteId = null;
   let activeOnRemote = null;
   const CLIENT_ID = `dev_${Math.random().toString(36).slice(2, 10)}`;
@@ -68,13 +68,6 @@ window.BR_CLOUD = (() => {
       // Trwałe zapamiętywanie logowania na telefonie (PWA)
       await auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL);
 
-      // Buforowanie offline w Firestore (działa w sklepie bez zasięgu)
-      try {
-        await db.enablePersistence({ synchronizeTabs: true });
-      } catch (err) {
-        // Ignoruj gdy wiele kart jest otwartych
-      }
-
       auth.onAuthStateChanged((user) => {
         currentUser = user;
         if (unsubscribeDoc) {
@@ -116,6 +109,8 @@ window.BR_CLOUD = (() => {
 
     const handleSnap = (snap, fromExplicitFetch = false) => {
       if (!snap.exists) return;
+      // Nie nadpisuj lokalnego stanu, gdy trwa wysyłanie naszego własnego zapisu
+      if (pendingWritesCount > 0) return;
       if (!fromExplicitFetch && snap.metadata && snap.metadata.hasPendingWrites) return;
       const data = snap.data();
       if (!data || !data.payload) return;
@@ -123,7 +118,6 @@ window.BR_CLOUD = (() => {
 
       isApplyingRemote = true;
       try {
-        // Jeśli dane przyszły z serwera (nie z lokalnego cache), wymuś zastosowanie niezależnie od zegara telefonu
         const isFromServer = fromExplicitFetch || !(snap.metadata && snap.metadata.fromCache);
         onRemoteState(data.payload, data.updatedAt || Date.now(), isFromServer);
       } finally {
@@ -161,10 +155,10 @@ window.BR_CLOUD = (() => {
   // Po powrocie do aplikacji PWA na telefonie natychmiast dociągnij najnowszy stan z serwera
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && db && currentUser && activeOnRemote) {
+      if (document.visibilityState === 'visible' && db && currentUser && activeOnRemote && pendingWritesCount === 0) {
         const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
         db.doc(docPath).get({ source: 'server' }).then((snap) => {
-          if (!snap.exists) return;
+          if (!snap.exists || pendingWritesCount > 0) return;
           const data = snap.data();
           if (!data || !data.payload) return;
           if (data.lastWriteId && data.lastWriteId === lastSentWriteId) return;
@@ -179,46 +173,45 @@ window.BR_CLOUD = (() => {
     });
   }
 
-  function pushState(state) {
+  async function pushState(state) {
     if (!db || !currentUser || isApplyingRemote) return;
     if (state && state.isDemo) return;
-    clearTimeout(syncTimer);
+    pendingWritesCount++;
     emit({
       mode: 'firebase',
       loggedIn: true,
       user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
       text: 'Zapisywanie...'
     });
-    syncTimer = setTimeout(async () => {
-      try {
-        const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
-        // Usuń ewentualne undefined/NaN, które blokują zapis w Firestore
-        const cleanPayload = JSON.parse(JSON.stringify(state));
-        const writeId = `${CLIENT_ID}_${Date.now()}`;
-        lastSentWriteId = writeId;
-        await db.doc(docPath).set({
-          payload: cleanPayload,
-          updatedAt: cleanPayload.updatedAt || Date.now(),
-          updatedBy: currentUser.email,
-          lastWriteId: writeId,
-          serverAt: window.firebase.firestore.FieldValue.serverTimestamp()
-        });
-        emit({
-          mode: 'firebase',
-          loggedIn: true,
-          user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
-          text: 'Chmura ✓'
-        });
-      } catch (err) {
-        console.error('Błąd zapisu do Firestore:', err);
-        emit({
-          mode: 'firebase',
-          loggedIn: true,
-          user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
-          text: `Błąd zapisu (${err && err.code ? err.code : 'sieć'})`
-        });
-      }
-    }, 80);
+    try {
+      const docPath = window.FIREBASE_FAMILY_DOC || 'families/kubala_budget';
+      const cleanPayload = JSON.parse(JSON.stringify(state));
+      const writeId = `${CLIENT_ID}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      lastSentWriteId = writeId;
+      await db.doc(docPath).set({
+        payload: cleanPayload,
+        updatedAt: cleanPayload.updatedAt || Date.now(),
+        updatedBy: currentUser.email,
+        lastWriteId: writeId,
+        serverAt: window.firebase.firestore.FieldValue.serverTimestamp()
+      });
+      emit({
+        mode: 'firebase',
+        loggedIn: true,
+        user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
+        text: 'Chmura ✓'
+      });
+    } catch (err) {
+      console.error('Błąd zapisu do Firestore:', err);
+      emit({
+        mode: 'firebase',
+        loggedIn: true,
+        user: { email: currentUser.email, label: resolveUserLabel(currentUser.email) },
+        text: `Błąd zapisu (${err && err.code ? err.code : 'sieć'})`
+      });
+    } finally {
+      pendingWritesCount = Math.max(0, pendingWritesCount - 1);
+    }
   }
 
   async function login(email, password) {

@@ -116,10 +116,17 @@ window.BR_MODALS = (() => {
       return;
     }
     const title = document.getElementById('txTitle').value.trim();
-    const date = document.getElementById('txDate').value;
+    let date = document.getElementById('txDate').value;
+    if (!date) {
+      const now = new Date();
+      const y = BR_APP.getYear() || String(now.getFullYear());
+      const m = BR_APP.getMonth() !== 'ALL' ? BR_APP.getMonth() : String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      date = `${y}-${m}-${d}`;
+    }
     const author = document.getElementById('txAuthor').value;
-    const txYear = date ? date.slice(0, 4) : BR_APP.getYear();
-    const txMonth = date ? date.slice(5, 7) : '01';
+    const txYear = date.slice(0, 4);
+    const txMonth = date.slice(5, 7);
 
     S.ensureYear(txYear);
 
@@ -134,7 +141,10 @@ window.BR_MODALS = (() => {
       toast('Zaktualizowano operację');
     } else {
       S.addTransaction(txYear, { date, month: txMonth, type: txType, category: txCategory, title, amount, author });
-      toast(txType === 'income' ? 'Dodano wpływ' : 'Dodano wydatek');
+      if (typeof BR_APP.resetFilters === 'function') BR_APP.resetFilters();
+      if (BR_APP.getYear() !== txYear) BR_APP.setYear(txYear);
+      if (BR_APP.getMonth() !== 'ALL' && BR_APP.getMonth() !== txMonth) BR_APP.setMonth(txMonth);
+      toast(txType === 'income' ? `Dodano wpływ (${date})` : `Dodano wydatek (${date})`);
     }
     closeModal('modalTx');
   }

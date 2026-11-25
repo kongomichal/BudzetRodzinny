@@ -291,7 +291,8 @@ window.BR_STORE = (() => {
       title: (tx.title || '').trim() || tx.category,
       amount: Math.abs(Number(tx.amount) || 0),
       author: tx.author || getActiveDeviceUser(),
-      isSummary: !!tx.isSummary
+      isSummary: !!tx.isSummary,
+      createdAt: Date.now()
     };
     yd.transactions.unshift(item);
     state.isDemo = false;

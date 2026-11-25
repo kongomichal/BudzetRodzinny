@@ -358,7 +358,7 @@ window.BR_APP = (() => {
         <div class="kpi-card c-green">
           <div class="kpi-label">Dochód łącznie</div>
           <div class="kpi-val green num">${C.fmt(sum.totalIncome)}</div>
-          <div class="kpi-sub">M: ${C.fmtShort(sum.incomeByCat['Wpływ M'])} • J: ${C.fmtShort(sum.incomeByCat['Wpływ J'])}</div>
+          <div class="kpi-sub">M: ${C.fmtShort(sum.incomeByCat['Wpływ M'])} • J: ${C.fmtShort(sum.incomeByCat['Wpływ J'])} • Inne: ${C.fmtShort(sum.incomeByCat['Wpływ Inne'])}</div>
         </div>
         <div class="kpi-card c-red">
           <div class="kpi-label">Wydatki łącznie</div>
@@ -454,7 +454,15 @@ window.BR_APP = (() => {
       );
     }
 
-    list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    list.sort((a, b) => {
+      // Wpisy dodane w aplikacji (tx_*) przed bezdatowymi wpisami zbiorczymi z importu Excela (tx26_*, hist_*)
+      const aIsApp = String(a.id || '').startsWith('tx_') ? 1 : 0;
+      const bIsApp = String(b.id || '').startsWith('tx_') ? 1 : 0;
+      if (aIsApp !== bIsApp) return bIsApp - aIsApp;
+      const dateCmp = (b.date || '').localeCompare(a.date || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
 
     const filteredSum = list.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
     const allCats = [...C.EXPENSE_CATEGORIES, ...C.INCOME_CATEGORIES];
@@ -1276,6 +1284,13 @@ window.BR_APP = (() => {
     render();
   }
 
+  function resetFilters() {
+    filterType = 'all';
+    filterCat = 'ALL';
+    filterAuthor = 'ALL';
+    filterQuery = '';
+  }
+
   function editTx(txId) {
     const yd = S.getYearData(currentYear);
     const tx = yd.transactions.find(t => t.id === txId);
@@ -1546,6 +1561,7 @@ window.BR_APP = (() => {
     handleFirebaseLogin,
     jumpToCategory,
     setFilter,
+    resetFilters,
     editTx,
     deleteTx,
     handleCarryForward,
