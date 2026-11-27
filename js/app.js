@@ -459,9 +459,11 @@ window.BR_APP = (() => {
       const aIsApp = String(a.id || '').startsWith('tx_') ? 1 : 0;
       const bIsApp = String(b.id || '').startsWith('tx_') ? 1 : 0;
       if (aIsApp !== bIsApp) return bIsApp - aIsApp;
-      const dateCmp = (b.date || '').localeCompare(a.date || '');
-      if (dateCmp !== 0) return dateCmp;
-      return (b.createdAt || 0) - (a.createdAt || 0);
+      // Najświeżej dodane/odklikane operacje zawsze na samej górze listy
+      if (a.createdAt || b.createdAt) {
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      }
+      return (b.date || '').localeCompare(a.date || '');
     });
 
     const filteredSum = list.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
@@ -1325,7 +1327,15 @@ window.BR_APP = (() => {
   }
 
   function handleToggleRecurring(recId) {
-    S.toggleRecurringPaid(currentYear, currentMonth, recId, true);
+    resetFilters();
+    const res = S.toggleRecurringPaid(currentYear, currentMonth, recId, true);
+    if (res && res.rec) {
+      if (res.paid) {
+        M.toast(`✓ Dodano do Rejestru (${res.rec.category || 'Subskrypcje'}): ${res.rec.name}`);
+      } else {
+        M.toast(`Usunięto z Rejestru: ${res.rec.name}`);
+      }
+    }
   }
 
   function openEditRecurring(recId) {

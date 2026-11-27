@@ -563,28 +563,38 @@ window.BR_STORE = (() => {
     if (md.paidRecurring[recId]) {
       const txId = md.paidRecurring[recId];
       delete md.paidRecurring[recId];
-      if (typeof txId === 'string' && txId.startsWith('tx_')) {
-        const yd = getYearData(year);
+      const yd = getYearData(year);
+      if (typeof txId === 'string' && txId.length > 0) {
         yd.transactions = yd.transactions.filter(t => t.id !== txId);
       }
       commit();
+      return { paid: false, rec };
     } else {
       if (alsoCreateTx) {
-        const dayStr = String(Math.min(Math.max(Number(rec.day) || 1, 1), 28)).padStart(2, '0');
-        const tx = addTransaction(year, {
-          date: `${year}-${monthId}-${dayStr}`,
+        const now = new Date();
+        const todayDay = String(now.getDate()).padStart(2, '0');
+        const yd = getYearData(year);
+        const item = {
+          id: C.uid('tx'),
+          date: `${year}-${monthId}-${todayDay}`,
           month: monthId,
           type: 'expense',
           category: rec.category || 'Subskrypcje',
           title: rec.name,
-          amount: rec.amount,
-          author: getActiveDeviceUser()
-        });
-        md.paidRecurring[recId] = tx.id;
+          amount: Math.abs(Number(rec.amount) || 0),
+          author: getActiveDeviceUser(),
+          isSummary: false,
+          createdAt: Date.now()
+        };
+        yd.transactions.unshift(item);
+        md.paidRecurring[recId] = item.id;
+        state.isDemo = false;
         commit();
+        return { paid: true, rec, tx: item };
       } else {
         md.paidRecurring[recId] = true;
         commit();
+        return { paid: true, rec };
       }
     }
   }
